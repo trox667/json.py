@@ -66,7 +66,7 @@ def is_int(token):
 
 def parse_bool(tokens):
     value = is_bool(tokens[0])
-    return value, 1 if value is not None else 0
+    return (value, 1) if value is not None else (None, 0)
 
 
 def parse_number(tokens):
@@ -113,7 +113,7 @@ def parse_array(tokens):
             pos += 1
             continue
         result, new_pos = parse_value(tokens[pos:])
-        if result:
+        if result is not None:
             arr.append(result)
             pos += new_pos
         else:
@@ -149,8 +149,8 @@ def parse_object(tokens):
         key, new_pos = parse_key(tokens[pos:])
         if key:
             pos += new_pos
-            value, new_pos = parse_value(tokens[pos:])
-            if value:
+            value, new_pos = parse(tokens[pos:])
+            if value is not None:
                 obj[key] = value
                 pos += new_pos
         else:
@@ -165,32 +165,39 @@ def parse(tokens):
     while pos < len(tokens):
         if tokens[pos].value == '{':
             result, new_pos = parse_object(tokens[pos:])
-            print(result)
             pos += new_pos
+            return result, pos
         elif tokens[pos].value == '[':
             result, new_pos = parse_array(tokens[pos:])
-            print(result)
             pos += new_pos
+            return result, pos
+        elif tokens[pos].value == '"' or tokens[pos].type == 'TEXT':
+            result, new_pos = parse_value(tokens[pos:])
+            pos += new_pos
+            return result, pos
         else:
             pos += 1
-    pass
+    return None, pos
 
 
 if __name__ == '__main__':
     json_array = '''
     [
-            "q", "w", "e", true, 123, 1e-2
+      "q", "w", "e", true, 123, 1e-2, false
     ]
     '''
     tokens = lex(json_array)
-    parse(tokens)
+    print(parse(tokens))
 
     json_object = '''
     {
-        "abc": "def"
+        "abc": "def";
+        "bcd": "efg";
+        "cde": ["c", "e", "d", 1, 1e-2];
+        "edf": false
     }
     '''
     tokens = lex(json_object)
-    parse(tokens)
+    print(parse(tokens))
 
     pass
