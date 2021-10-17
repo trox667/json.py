@@ -1,98 +1,135 @@
-import functools
-import string
+WHITESPACES = [
+    ' ',
+    '\n',
+    '\t'
+]
+RESERVED = [
+    '"',
+    ':',
+    '[',
+    ']',
+    '{',
+    '}',
+    ','
+]
 
 
-class ParseResult:
-    def __init__(self):
-        self.is_ok = False
-        self.value = ''
+class Token:
+    def __init__(self, value, type):
+        self.value = value
+        self.type = type
 
     def __repr__(self):
-        return '%s (%s, %s)' % (self.__class__, self.is_ok, self.value)
+        return "Token('%s', %s)" % (self.type, self.value)
 
 
-class Success(ParseResult):
-    def __init__(self, value):
-        super().__init__()
-        self.is_ok = True
-        self.value = value
-
-
-class Failure(ParseResult):
-    def __init__(self, msg):
-        super().__init__()
-        self.is_ok = False
-        self.value = msg
-
-
-class Parser:
-    def __init__(self, parser_func):
-        self.parser_func = parser_func
-
-
-def run(parser, input):
-    return parser(input)
-
-
-def combine(parser_a, parser_b):
-    def inner(characters):
-        result_a = run(parser_a, characters)
-        if not result_a.is_ok:
-            return result_a
+def lex(characters):
+    tokens = []
+    text = ''
+    for char in characters:
+        if char in WHITESPACES:
+            continue
+        elif char in RESERVED:
+            if len(text) > 0:
+                tokens.append(Token(text, 'TEXT'))
+                text = ''
+            tokens.append(Token(char, 'RESERVED'))
         else:
-            (value_a, remaining_a) = result_a.value
-            result_b = run(parser_b, remaining_a)
-            if not result_b.is_ok:
-                return result_b
-            else:
-                (value_b, remaining_b) = result_b.value
-                new_value = (value_a, value_b)
-                return Success((new_value, remaining_b))
+            text += char
 
-    return inner
+    return tokens
 
 
-def or_else(parser_a, parser_b):
-    def inner(characters):
-        result_a = run(parser_a, characters)
-        if result_a.is_ok:
-            return result_a
-        else:
-            return run(parser_b, characters)
-        pass
-    return inner
+def is_bool(token):
+    if token == 'true':
+        return True
+    elif token == 'false':
+        return False
+    return None
 
 
-def choice(parsers):
-    return functools.reduce(or_else, parsers)
+def is_float(token):
+    try:
+        return True, float(token)
+    except:
+        return False, None
 
 
-def any_of(characters):
-    return choice([parse_char(char) for char in characters])
+def is_int(token):
+    try:
+        return True, int(token)
+    except:
+        return False, None
 
 
-def parse_char(char):
-    def inner(characters):
-        if not characters:
-            return Failure('No more input')
-        else:
-            first = characters[0]
-            if first is char:
-                return Success((char, characters[1:]))
-            else:
-                return Failure('Expecting "%c". Got "%c"' % (char, first))
+def parse_bool(tokens):
+    value = is_bool(tokens[0])
+    return value, 1 if value is not None else 0
 
-    return inner
+
+def parse_number(tokens):
+    result, value = is_float(tokens[0])
+    if result:
+        return value, 1
+    else:
+        result, value = is_int(tokens[0])
+        return (value, 1) if result else (None, 0)
+
+
+def parse_string(tokens):
+    if len(tokens) < 3:
+        return None, 0
+    if tokens[0].value == '"' and tokens[1].type == 'TEXT' and tokens[2].value == '"':
+        return tokens[1].value, 3
+    else:
+        return None, 0
+
+
+def parse_value(tokens):
+    result, pos = parse_bool(tokens)
+    if result is not None:
+        return result, pos
+
+    result, pos = parse_number(tokens)
+    if result is not None:
+        return result, pos
+
+    return parse_string(tokens)
+
+
+def parse_array(tokens):
+    pos = 0
+    if not tokens[pos].value == '[':
+        return None, pos
+
+    pos = 1
+    arr = []
+    while pos < len(tokens):
+        if tokens[pos].value == ']':
+            return arr, pos+1
+        elif tokens[pos].value == ',':
+            pos += 1
+            continue
+        result, new_pos = parse_value(tokens[pos:])
+        pos += new_pos
+
+    return arr, pos
+
+
+def parse(tokens):
+    pos = 0
+    while pos < len(tokens):
+        result, new_pos = parse_array(tokens)
+        pos += new_pos
+    pass
 
 
 if __name__ == '__main__':
-    parse_lowercase = any_of(string.ascii_lowercase)
-    parse_digit = any_of('0123456789')
-
-    print(run(parse_lowercase, 'aBC'))
-    print(run(parse_lowercase, 'ABC'))
-
-    print(run(parse_digit, '1ABC'))
-    print(run(parse_digit, '9ABC'))
-    print(run(parse_digit, '|ABC'))
+    json_array = '''
+    [
+            "q", "w", "e"
+    ]
+    '''
+    tokens = lex(json_array)
+    parse(tokens)
     pass
