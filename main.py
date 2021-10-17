@@ -1,3 +1,5 @@
+import sys
+
 WHITESPACES = [
     ' ',
     '\n',
@@ -41,23 +43,23 @@ def lex(characters):
 
 
 def is_bool(token):
-    if token == 'true':
+    if token.value == 'true':
         return True
-    elif token == 'false':
+    elif token.value == 'false':
         return False
     return None
 
 
 def is_float(token):
     try:
-        return True, float(token)
+        return True, float(token.value)
     except:
         return False, None
 
 
 def is_int(token):
     try:
-        return True, int(token)
+        return True, int(token.value)
     except:
         return False, None
 
@@ -111,25 +113,84 @@ def parse_array(tokens):
             pos += 1
             continue
         result, new_pos = parse_value(tokens[pos:])
-        pos += new_pos
+        if result:
+            arr.append(result)
+            pos += new_pos
+        else:
+            sys.exit(-1)
+            pass
 
     return arr, pos
+
+
+def parse_key(tokens):
+    if tokens[3].value == ':':
+        result, pos = parse_string(tokens)
+        pos += 1
+        return result, pos
+    else:
+        return None, 0
+
+
+def parse_object(tokens):
+    pos = 0
+    if not tokens[pos].value == '{':
+        return None, pos
+
+    pos = 1
+    obj = {}
+    while pos < len(tokens):
+        if tokens[pos].value == '}':
+            return obj, pos + 1
+            pass
+        elif tokens[pos].value == ';':
+            pos += 1
+            continue
+        key, new_pos = parse_key(tokens[pos:])
+        if key:
+            pos += new_pos
+            value, new_pos = parse_value(tokens[pos:])
+            if value:
+                obj[key] = value
+                pos += new_pos
+        else:
+            sys.exit(-1)
+            pass
+
+    pass
 
 
 def parse(tokens):
     pos = 0
     while pos < len(tokens):
-        result, new_pos = parse_array(tokens)
-        pos += new_pos
+        if tokens[pos].value == '{':
+            result, new_pos = parse_object(tokens[pos:])
+            print(result)
+            pos += new_pos
+        elif tokens[pos].value == '[':
+            result, new_pos = parse_array(tokens[pos:])
+            print(result)
+            pos += new_pos
+        else:
+            pos += 1
     pass
 
 
 if __name__ == '__main__':
     json_array = '''
     [
-            "q", "w", "e"
+            "q", "w", "e", true, 123, 1e-2
     ]
     '''
     tokens = lex(json_array)
     parse(tokens)
+
+    json_object = '''
+    {
+        "abc": "def"
+    }
+    '''
+    tokens = lex(json_object)
+    parse(tokens)
+
     pass
